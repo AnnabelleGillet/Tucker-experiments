@@ -1,6 +1,6 @@
 # Experiments on the Tucker decomposition
 
-This repository gathers some experiments showing the capabilities of the Tucker decomposition for data analysis. Two major algorithms are studied, the Higher-Order Orthogonal Iteration (HOOI) and the Hierarchical Alternating Least Squares (HALS-NTD).
+This repository gathers several experiments showing the capabilities of the Tucker decomposition for data analysis. Two major algorithms are studied, the Higher-Order Orthogonal Iteration (HOOI) and the Hierarchical Alternating Least Squares (HALS-NTD).
 
 ## Dependencies
 
