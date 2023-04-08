@@ -6,6 +6,8 @@ r = ones(N, 1);
 for n = 1:N
     Yn = double(tenmat(Y,n));
     S = sort(eig(Yn * Yn'), 'descend');
+    figure
+    plot(S)
     s = sum(sum(S));
     nb = 0;
     total = 0.0;
@@ -15,6 +17,7 @@ for n = 1:N
         nb = nb + 1;
         i = i + 1;
     end
+    xline(nb, '--r', num2str(nb), 'LineWidth', 1)
     r(n) = nb;
 end
 ranks = r;

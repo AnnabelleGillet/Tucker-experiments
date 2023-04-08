@@ -1,0 +1,176 @@
+%% Load file
+% Read the file a first time to know how many elements we have on each
+% dimension.
+fid = fopen('datasets/primaryschool.csv');
+tline = fgetl(fid);
+students = {};
+times = {};
+time_granularity = 5;
+while ischar(tline)
+    line = split(tline, char(9));
+    time = num2str(floor(str2num(line{1}) / (time_granularity * 60)));
+    student1 = strcat(line{4}, {'-'}, line{2});
+    student2 = strcat(line{5}, {'-'}, line{3});
+    if ~any(strcmp(students, student1{1}))
+        students{length(students)+1} = student1{1};
+    end
+    if ~any(strcmp(students, student2{1}))
+        students{length(students)+1} = student2{1};
+    end
+    if ~any(strcmp(times, time))
+        times{length(times)+1} = time;
+    end
+    tline = fgetl(fid);
+end
+fclose(fid);
+students = sort(students);
+
+%% Construct tensor
+% Two dimensions reprsent the persons, and the third dimension represent
+% the time, with a granularity of 5 minutes. When a person p1 interacts
+% with a person p2 at a time t, the value 1 is put as corresponding element
+% indexed by p1, p2 and t. 
+tensor_data = zeros(length(students), length(students), length(times));
+fid = fopen('datasets/primaryschool.csv');
+tline = fgetl(fid);
+while ischar(tline)
+    line = split(tline, char(9));
+    time = num2str(floor(str2num(line{1}) / (time_granularity * 60)));
+    student1 = strcat(line{4}, {'-'}, line{2});
+    student2 = strcat(line{5}, {'-'}, line{3});
+    index_student1 = find(strcmp(students, student1{1}));
+    index_student2 = find(strcmp(students, student2{1}));
+    index_time = find(strcmp(times, time));
+    tensor_data(index_student1, index_student2, index_time) = 1.0;
+    tensor_data(index_student2, index_student1, index_time) = 1.0;
+    tline = fgetl(fid);
+end
+fclose(fid);
+ps_tensor = tensor(tensor_data);
+
+%% Run HALS decomposition
+opts = struct('lda_ortho', 1, 'init', 'eigs');
+[~, ps_fm, ps_core, ps_fit, ~] = tucker_localhals(ps_tensor, [13, 13, 4], opts);
+
+%% Visualize factor matrices
+% The factor matrices representing the persons are visualized as heatmap,
+% in which the students are sorted according to their class (first the
+% stdents of class 1A, then 1B, and so on until 5B). The teachers are put
+% at the end. 
+figure
+plot_time(ps_fm{3});
+
+figure
+plot_fm_students(ps_fm{1}, students);
+
+figure
+plot_fm_students(ps_fm{2}, students);
+
+%% Visualize best ranks
+% The best ranks are the vectors of each factor matrices that index the
+% highest values of the core tensor.
+sorted_ps_core_tensor = sort_core_tensor(ps_core.data);
+for i = 1:5
+    figure
+    see(ttensor(ps_core, ps_fm), sorted_ps_core_tensor{i, 2}, students);
+end
+
+%% Visualize best ranks for a specific rank on dimension 1
+% Show the best ranks when we consider only the sub core tensor that
+% corresponds to rank selected on the first dimension.
+rank_to_see = 8;
+sorted_ps_core_tensor = sort_core_tensor(ps_core.data(rank_to_see, :, :));
+total = sum(cell2mat(sorted_ps_core_tensor(:, 1)));
+somme = 0.0;
+i = 1;
+while (somme < total * 0.99)
+    figure
+    somme = somme + sorted_ps_core_tensor{i, 1};
+    ranks_to_see = sorted_ps_core_tensor{i, 2};
+    ranks_to_see(1) = rank_to_see;
+    see(ttensor(ps_core, ps_fm), ranks_to_see, students);
+    i = i + 1;
+end
+
+%% Functions declaration
+function [] = plot_fm_students(matrix, students)
+    t = tiledlayout(1, 11);
+    t.TileSpacing = 'compact';
+    t.Padding = 'compact';
+    fontsize = 30;
+    for i = 1:5
+        students_of_class = find(contains(students, strcat(num2str(i), 'A')));
+        nexttile
+        heatmap((matrix(students_of_class, :) ./ max(matrix))', 'ColorMap', jet, 'xData', students(students_of_class), 'FontSize', fontsize);
+        title(strcat('Class ', num2str(i), 'A'));
+        Ax = gca;
+        Ax.XDisplayLabels = nan(size(Ax.XDisplayData));
+        if i > 1
+            Ax.YDisplayLabels = nan(size(Ax.YDisplayData));
+        else
+            
+        end
+        colorbar off
+        nexttile
+        students_of_class = find(contains(students, strcat(num2str(i), 'B')));
+        heatmap((matrix(students_of_class, :) ./ max(matrix))', 'ColorMap', jet, 'xData', students(students_of_class), 'FontSize', fontsize);
+        title(strcat('Class ', num2str(i), 'B'));
+        Ax = gca;
+        Ax.XDisplayLabels = nan(size(Ax.XDisplayData));
+        Ax.YDisplayLabels = nan(size(Ax.YDisplayData));
+        colorbar off
+    end
+    nexttile
+    teachers = find(contains(students, 'Teacher'));
+    heatmap((matrix(teachers, :) ./ max(matrix))', 'ColorMap', jet, 'xData', students(teachers), 'FontSize', fontsize);
+    Ax = gca;
+    Ax.XDisplayLabels = nan(size(Ax.XDisplayData));
+    Ax.YDisplayLabels = nan(size(Ax.YDisplayData));
+    title('Teachers');
+end
+
+function [plt] = plot_time(time_factor_matrix)
+    [~, nb] = size(time_factor_matrix);
+    t = tiledlayout(nb, 2);
+    t.TileSpacing = 'compact';
+    t.Padding = 'compact';
+    granularity = 5;
+    t = datetime(0,0,0,8,30,0):minutes(granularity):datetime(0,0,0,17,5,0);
+    fontsize = 30;
+    for i = 1:nb
+        vector_to_plot = time_factor_matrix(:,i);
+        day1 = vector_to_plot(1:length(vector_to_plot) / 2, :);
+        day2 = vector_to_plot(1 + (length(vector_to_plot) / 2):end, :);
+    
+        nexttile
+        plot(t, day1);
+        if (i == 1)
+            title("Day 1", 'FontSize', fontsize);
+        end
+        datetick('x','HH:MM', 'keeplimits');
+        ylabel(strcat("Rank ", num2str(i)), 'FontSize', fontsize);
+        ax = gca;
+        ax.FontSize = fontsize - 5;
+        xline(datetime(0,0,0,12,0,0), '--r', {'Lunch', 'Break'}, 'FontSize', fontsize - 5)
+        xline(datetime(0,0,0,14,0,0), '--r')
+        xline(datetime(0,0,0,10,0,0), '--r', {'Morning', 'Break'}, 'FontSize', fontsize - 5)
+        xline(datetime(0,0,0,11,0,0), '--r')
+        xline(datetime(0,0,0,15,15,0), '--r', {'Afternoon', 'Break'}, 'FontSize', fontsize - 5)
+        xline(datetime(0,0,0,16,15,0), '--r')
+
+        nexttile
+        plot(t, day2);
+        if (i == 1)
+            title("Day 2", 'FontSize', fontsize);
+        end
+        datetick('x','HH:MM', 'keeplimits');
+        ax = gca;
+        ax.FontSize = fontsize - 5;
+        xline(datetime(0,0,0,12,0,0), '--r', {'Lunch', 'Break'}, 'FontSize', fontsize - 5)
+        xline(datetime(0,0,0,14,0,0), '--r')
+        xline(datetime(0,0,0,10,0,0), '--r', {'Morning', 'Break'}, 'FontSize', fontsize - 5)
+        xline(datetime(0,0,0,11,0,0), '--r')
+        xline(datetime(0,0,0,15,15,0), '--r', {'Afternoon', 'Break'}, 'FontSize', fontsize - 5)
+        xline(datetime(0,0,0,16,15,0), '--r')
+    end
+end
