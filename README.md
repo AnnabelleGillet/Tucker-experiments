@@ -31,4 +31,6 @@ Three data mining techniques are applied using the result of the Tucker decompos
 ## Reference
 To cite this work, please use the following reference:
 
+GILLET, Annabelle, LECLERCQ, Éric, et SAUTOT, Lucile. A Guide to the Tucker Tensor Decomposition for Data Mining: Exploratory Analysis, Clustering and Classification. In : Transactions on Large-Scale Data-and Knowledge-Centered Systems LIV: Special Issue on Data Management-Principles, Technologies, and Applications. Berlin, Heidelberg : Springer Berlin Heidelberg, 2023. p. 56-88.
+
 GILLET, Annabelle, LECLERCQ, Eric, et SAUTOT, Lucile. The Tucker tensor decomposition for data analysis: capabilities and advantages. In : 38ème Conférence sur la Gestion de Données (BDA). 2022.
